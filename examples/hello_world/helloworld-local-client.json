@@ -1,0 +1,21 @@
+{
+    "unicast": "172.18.0.2",
+    "logging": {
+        "level": "debug",
+        "console": "true"
+    },
+    "applications": [
+        {
+            "name": "hello_world_service",
+            "id": "0x4444"
+        },
+        {
+            "name": "hello_world_client",
+            "id": "0x5555"
+        }
+    ],
+    "routing": "hello_world_client",
+    "service-discovery": {
+        "enable": "true"
+    }
+}
