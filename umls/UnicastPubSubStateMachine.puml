@@ -1,0 +1,31 @@
+@startuml
+scale 1.5
+
+state "Eventgroup_PubSub (Unicast Eventgroup)" as main {
+    ' Service State Part
+    state "Service Down" as ServiceDown
+    [*] --> ServiceDown : [Service==Down]
+    ServiceDown --> ServiceUp : ServiceUp
+    ServiceDown --> ServiceDown : ServiceDown
+
+    state "OfferService is implicit\nPublish/Eventgroup" as OfferService
+
+    ' Subscription State Part
+    state "Not Subscribed" as NotSubscribed
+    state "Subscribed" as Subscribed
+
+    [*] --> NotSubscribed
+
+    NotSubscribed --> Subscribed : receive(SubscribeEventgroup)\n/enableEvents()
+    Subscribed --> Subscribed : receive(SubscribedEventgroup)\n/send(SubscribedEventgroupAck)
+    Subscribed --> NotSubscribed : receive(StopSubscribeEventgroup)\n/disableEvents()
+    Subscribed --> NotSubscribed : TTL_expired [SubscriptionCounter==1]\n/disableEvents()
+
+    note bottom of Subscribed
+        AUTOSAR:
+        * enableEvents = enableTxRoutingGroup
+        * disableEvents = disableTxRoutingGroup
+    end note
+}
+
+@enduml

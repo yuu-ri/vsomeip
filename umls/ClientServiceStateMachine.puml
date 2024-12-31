@@ -1,0 +1,68 @@
+@startuml
+skinparam state {
+  BackgroundColor LightYellow
+  BorderColor Black
+}
+
+[*] --> NotRequested : Initial
+
+state NotRequested {
+  [*] --> ServiceNotSeen
+  
+  state ServiceNotSeen {
+    [*] --> Initial
+    Initial --> ServiceSeen : receive(OfferService)\ngetTimer(TTL)
+    Initial --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
+    Initial --> NotRequested : Timer expired (TTL)\nreceive(StopServiceOffer)
+  }
+
+  state ServiceSeen {
+    [*] --> Initial
+    Initial --> ServiceSeen : receive(ServiceOffer)\nresetTimer(TTL)
+    Initial --> ServiceNotSeen : Timer expired (TTL)
+  }
+}
+
+state "Requested but Not Ready" {
+  [*] --> SearchingForService : ServiceRequested\nand if-status=up_and_configured
+
+  SearchingForService --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
+  SearchingForService --> Main : [ServiceReady]
+
+  state SearchingForService {
+    [*] --> InitialWaitPhase
+    
+    state InitialWaitPhase {
+      [*] --> TimerSet : /setTimerInRange(INITIAL_DELAY_MIN, INITIAL_DELAY_MAX)
+      TimerSet --> RepetitionPhase : Timer expired\nsend(FindService)
+    }
+    
+    state RepetitionPhase {
+      [*] --> TimerSet : /run=0\nsetTimer(2^run * REPETITIONS_BASE_DELAY)
+      TimerSet --> RepetitionPhase : Timer expired\nsend(FindService)\nrun++\nsetTimer(2^run * REPETITIONS_BASE_DELAY) [run < REPETITIONS_MAX]
+      TimerSet --> RepetitionExpired : Timer expired\n[run=REPETITIONS_MAX]
+    }
+    
+    RepetitionExpired --> NotRequested : receive(StopOfferService)
+  }
+}
+
+state Main {
+  [*] --> ServiceReady
+
+  state ServiceReady {
+    [*] --> Initial
+    Initial --> Stopped : receive(StopOfferService)\n/cancelTimer(TTL)
+    Initial --> ServiceReady : receive(OfferService)\nresetTimer(TTL)
+    Initial --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
+    Initial --> NotRequested : Timer expired (TTL)
+  }
+  
+  Stopped --> ServiceReady : InternalServiceRequest\n[if status=up_and_configured]
+}
+
+NotRequested --> "Requested but Not Ready" : ServiceRequested\nand if-status=up_and_configured
+Main --> NotRequested : [ServiceNotRequested]
+
+@enduml
+
