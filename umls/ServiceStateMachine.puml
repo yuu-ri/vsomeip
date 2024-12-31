@@ -1,0 +1,41 @@
+@startuml
+skinparam state {
+  BackgroundColor LightYellow
+  BorderColor Black
+}
+
+[*] --> NotReady : [if status!=up_and_configured\nor service-status=down]
+
+state NotReady {
+  [*] --> Initial : [if status!=up_and_configured]
+  
+  Initial --> Ready : [if status=up_and_configured\nand service-status=up]
+  Initial --> NotReady : [if status!=up_and_configured\nor service-status=down]
+}
+
+state Ready {
+  [*] --> InitialWaitPhase
+  
+  state InitialWaitPhase {
+    [*] --> TimerSet : SetTimerInRange(INITIAL_DELAY_MIN, INITIAL_DELAY_MAX)
+    TimerSet --> RepetitionPhase : Timer expired\nsend(OfferService)
+  }
+
+  state RepetitionPhase {
+    [*] --> TimerSet : run=0\nsetTimer(2^run * REPETITIONS_BASE_DELAY)
+    TimerSet --> RepetitionPhase : Timer expired\nsend(OfferService)\nrun++\nsetTimer(2^run * REPETITIONS_BASE_DELAY) [runs < REPETITIONS_MAX]
+    TimerSet --> MainPhase : Timer expired\n[runs = REPETITIONS_MAX]
+  }
+
+  state MainPhase {
+    [*] --> TimerSet : /setTimer(CYCLIC_ANNOUNCE_DELAY)\nsend(OfferService)
+    TimerSet --> TimerSet : Timer expired\nsend(OfferService)\n/setTimer(CYCLIC_ANNOUNCE_DELAY)
+    TimerSet --> MainPhase : receive(FindService)\nwaitAndSend(OfferService)\nresetTimer()
+  }
+}
+
+NotReady --> Ready : [if status=up_and_configured\nand service-status=up]
+Ready --> NotReady : [status changed or service-status=down]\nclearAllTimers()\nsend(StopOfferService)
+
+@enduml
+
