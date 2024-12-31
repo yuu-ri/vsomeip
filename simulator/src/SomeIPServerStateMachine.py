@@ -1,6 +1,7 @@
 import time
 import random
 import socket
+import threading
 
 
 class SomeIPServerStateMachine:
@@ -47,6 +48,22 @@ class SomeIPServerStateMachine:
         self.sock.sendto(message.encode(), ("127.0.0.1", 30491))
         print("Server: Sent StopOfferService")
 
+    def clear_all_timers(self):
+        """Clear all active timers."""
+        self.timer = None
+        print("Server State Machine: All timers cleared.")
+
+    def transition_to_not_ready(self, service_status_changed=False):
+        """
+        Transition from Ready to Not Ready.
+        Only send StopOfferService if service_status changes to False.
+        """
+        if service_status_changed:
+            self.send_stop_offer_service()
+        self.clear_all_timers()
+        self.state = "NotReady"
+        print("Server State Machine: Transitioned to NotReady.")
+
     def receive_find_service(self):
         """Receive FindService message (non-blocking)."""
         try:
@@ -73,7 +90,11 @@ class SomeIPServerStateMachine:
 
     def handle_ready(self):
         """Handle transitions for the Ready state."""
-        if self.substate == "InitialWaitPhase":
+        if not self.ifstatus_up_and_configured:
+            self.transition_to_not_ready()
+        elif not self.service_status_up:
+            self.transition_to_not_ready(service_status_changed=True)
+        elif self.substate == "InitialWaitPhase":
             if self.timer_expired():
                 self.transition_to_state("Ready", "RepetitionPhase")
                 self.run = 0
@@ -116,7 +137,12 @@ class SomeIPServerStateMachine:
 
 # Example usage:
 server_state_machine = SomeIPServerStateMachine()
+server_thread = threading.Thread(target=server_state_machine.run_state_machine, daemon=True)
+server_thread.start()
 server_state_machine.ifstatus_up_and_configured = True  # Simulate network interface status
 server_state_machine.service_status_up = True  # Simulate service status
-server_state_machine.run_state_machine()
+time.sleep(20)  # Small delay to prevent 100% CPU utilization
+server_state_machine.service_status_up = False # Simulate service status
+server_thread.join()
+
 

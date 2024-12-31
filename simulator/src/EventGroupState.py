@@ -63,7 +63,9 @@ class EventgroupPubSubStateMachine:
 
     def handle_service_up(self):
         """Handle the Service Up state and its substates."""
-        if self.substate == "NotSubscribed":
+        if self.service_status == "Down":
+            self.transition_to_state("ServiceDown")
+        elif self.substate == "NotSubscribed":
             message = self.receive_message()
             if message == "SubscribeEventgroup":
                 self.transition_to_state("ServiceUp", "Subscribed")

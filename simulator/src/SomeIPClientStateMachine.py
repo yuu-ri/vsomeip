@@ -16,6 +16,7 @@ class SomeIPClientStateMachine:
         self.udp_ip = udp_ip
         self.udp_port = udp_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((self.udp_ip, self.udp_port))
         self.sock.settimeout(0.1)  # Non-blocking with a 100ms timeout
         self.timer = None
         self.run = 0
@@ -42,9 +43,10 @@ class SomeIPClientStateMachine:
         print("Client: Sent FindService")
 
     def receive_offer_service(self):
-        """Receive OfferService message (non-blocking)."""
+        print("""Receive OfferService message (non-blocking).""")
         try:
             data, addr = self.sock.recvfrom(1024)
+            print(data)
             if data.decode() == "OfferService":
                 print("Client: Received OfferService")
                 return True
@@ -119,14 +121,17 @@ class SomeIPClientStateMachine:
         """Handle transitions for the Main state."""
         if self.substate == "ServiceReady":
             if self.timer_expired():
-                print("Client: TTL expired. Stopping service.")
-                self.transition_to_state("Stopped")
+                print("Client: TTL expired. Transitioning to Searching for Service.")
+                self.transition_to_state("SearchingForService", "InitialWaitPhase")
+                delay = random.uniform(self.INITIAL_DELAY_MIN, self.INITIAL_DELAY_MAX)
+                self.set_timer(delay)
             elif self.receive_stop_offer_service():
                 self.transition_to_state("Stopped")
             elif self.receive_offer_service():
                 self.reset_timer(self.TTL)
         elif self.substate == "Stopped":
             self.handle_stopped()
+
     def run_state_machine(self):
         """Run the state machine."""
         while True:
@@ -147,6 +152,5 @@ class SomeIPClientStateMachine:
 
 # Example usage:
 client_state_machine = SomeIPClientStateMachine()
-client_state_machine.ifstatus_up_and_configured = True # Simulates the ifstatus condition
+client_state_machine.ifstatus_up_and_configured = True  # Simulates the ifstatus condition
 client_state_machine.run_state_machine()
-
