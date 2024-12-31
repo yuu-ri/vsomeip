@@ -1,0 +1,43 @@
+@startuml
+actor "Service Provider" as SP
+actor "Client" as CL
+participant "SOME/IP-SD Multicast Group" as Multicast
+
+title SOME/IP Service Discovery Basic Sequence
+
+== Service Discovery Announcement ==
+SP -> Multicast : Offer Service [Service ID]
+note right of SP
+  Service provider broadcasts
+  its service offering.
+end note
+
+== Service Discovery Subscription ==
+CL -> Multicast : Find Service [Service ID]
+note right of CL
+  Client broadcasts to find
+  the desired service.
+end note
+
+Multicast -> SP : Forward Find Service
+SP -> CL : Offer Service Response [Service ID]
+note left of SP
+  Service provider responds
+  to the client's request.
+end note
+
+== Communication Establishment ==
+CL -> SP : Subscribe Eventgroup
+SP -> CL : Acknowledge Subscription
+note left of SP
+  The service provider
+  acknowledges the event group
+  subscription request.
+end note
+
+== Service Usage ==
+CL -> SP : Request/Response or Notification
+SP --> CL : Send Service Data
+
+@enduml
+
