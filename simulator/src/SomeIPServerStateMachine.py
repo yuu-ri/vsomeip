@@ -3,7 +3,6 @@ import random
 import socket
 import threading
 
-
 class SomeIPServerStateMachine:
     INITIAL_DELAY_MIN = 1  # Minimum delay for Initial Wait Phase
     INITIAL_DELAY_MAX = 2  # Maximum delay for Initial Wait Phase
@@ -28,6 +27,12 @@ class SomeIPServerStateMachine:
         """Set a timer for the current state."""
         self.timer = time.time() + delay
 
+    def set_timer_in_range(self, min_delay, max_delay):
+        """Set a timer with a random delay in the specified range."""
+        delay = random.uniform(min_delay, max_delay)
+        self.set_timer(delay)
+        print(f"Server: Timer set for {delay:.2f} seconds.")
+
     def reset_timer(self, delay):
         """Reset the timer with a new delay."""
         self.set_timer(delay)
@@ -48,21 +53,96 @@ class SomeIPServerStateMachine:
         self.sock.sendto(message.encode(), ("127.0.0.1", 30491))
         print("Server: Sent StopOfferService")
 
+    def wait_and_send_offer_service(self):
+        """Simulate waiting and sending an OfferService message."""
+        time.sleep(0.1)  # Simulated wait
+        self.send_offer_service()
+
     def clear_all_timers(self):
         """Clear all active timers."""
         self.timer = None
         print("Server State Machine: All timers cleared.")
 
-    def transition_to_not_ready(self, service_status_changed=False):
-        """
-        Transition from Ready to Not Ready.
-        Only send StopOfferService if service_status changes to False.
-        """
-        if service_status_changed:
+    def handle_initial_ready(self):
+        """Handle the initial entry point for the Ready state."""
+        print("Server: Handling initial Ready state.")
+        self.substate = "InitialWaitPhase"
+        self.handle_initial_initial_wait_phase()
+        print("Server: Transitioned to Ready -> InitialWaitPhase.")
+
+    def handle_initial_initial_wait_phase(self):
+        """Handle the initial entry point for the InitialWaitPhase substate."""
+        self.set_timer_in_range(self.INITIAL_DELAY_MIN, self.INITIAL_DELAY_MAX)
+        print("Server: Handling initial InitialWaitPhase.")
+
+    def handle_initial_repetition_phase(self):
+        """Handle the initial entry point for the RepetitionPhase substate."""
+        print("Server: Handling initial RepetitionPhase.")
+        self.run = 0
+        self.set_timer(self.REPETITIONS_BASE_DELAY)
+
+    def handle_initial_main_phase(self):
+        """Handle the initial entry point for the MainPhase substate."""
+        print("Server: Handling initial MainPhase.")
+        self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
+
+    def handle_not_ready(self):
+        """Handle the Not Ready state."""
+        if self.ifstatus_up_and_configured and self.service_status_up:
+            self.state = "Ready"
+            self.handle_initial_ready()
+
+    def handle_initial_wait_phase(self):
+        """Handle the Initial Wait Phase substate."""
+        if self.timer_expired():
+            self.send_offer_service()
+            self.substate = "RepetitionPhase"
+            self.handle_initial_repetition_phase()
+
+    def handle_repetition_phase(self):
+        """Handle the Repetition Phase substate."""
+        if self.timer_expired():
+            if self.run < self.REPETITIONS_MAX:
+                self.send_offer_service()
+                self.run += 1
+                delay = self.REPETITIONS_BASE_DELAY * (2 ** self.run)
+                self.set_timer(delay)
+                print(f"Server: Repetition {self.run}, next delay: {delay:.2f} seconds.")
+            else:
+                self.substate = "MainPhase"
+                self.handle_initial_main_phase()
+        elif self.receive_find_service():
+            self.wait_and_send_offer_service()
+            self.set_timer(self.REPETITIONS_BASE_DELAY)
+
+    def handle_main_phase(self):
+        """Handle the Main Phase substate."""
+        if self.timer_expired():
+            self.send_offer_service()
+            self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
+        elif self.receive_find_service():
+            self.wait_and_send_offer_service()
+            self.reset_timer(self.CYCLIC_ANNOUNCE_DELAY)
+
+    def handle_ready(self):
+        """Handle the Ready state."""
+        if not self.ifstatus_up_and_configured:
+            self.state = "NotReady"
+            self.substate = None
+            self.clear_all_timers()
+            print("Server: Transitioned to NotReady.")
+        elif not self.service_status_up:
+            self.state = "NotReady"
+            self.substate = None
             self.send_stop_offer_service()
-        self.clear_all_timers()
-        self.state = "NotReady"
-        print("Server State Machine: Transitioned to NotReady.")
+            self.clear_all_timers()
+            print("Server: Transitioned to NotReady with StopOfferService.")
+        elif self.substate == "InitialWaitPhase":
+            self.handle_initial_wait_phase()
+        elif self.substate == "RepetitionPhase":
+            self.handle_repetition_phase()
+        elif self.substate == "MainPhase":
+            self.handle_main_phase()
 
     def receive_find_service(self):
         """Receive FindService message (non-blocking)."""
@@ -75,65 +155,26 @@ class SomeIPServerStateMachine:
             pass
         return False
 
-    def transition_to_state(self, state, substate=None):
-        """Generic method for transitioning to a new state."""
-        self.state = state
-        self.substate = substate
-        print(f"Server: Transitioning to {state} {substate if substate else ''}")
-
-    def handle_not_ready(self):
-        """Handle the NotReady state."""
-        if self.ifstatus_up_and_configured and self.service_status_up:
-            self.transition_to_state("Ready", "InitialWaitPhase")
-            delay = random.uniform(self.INITIAL_DELAY_MIN, self.INITIAL_DELAY_MAX)
-            self.set_timer(delay)
-
-    def handle_ready(self):
-        """Handle transitions for the Ready state."""
-        if not self.ifstatus_up_and_configured:
-            self.transition_to_not_ready()
-        elif not self.service_status_up:
-            self.transition_to_not_ready(service_status_changed=True)
-        elif self.substate == "InitialWaitPhase":
-            if self.timer_expired():
-                self.transition_to_state("Ready", "RepetitionPhase")
-                self.run = 0
-                self.set_timer(self.REPETITIONS_BASE_DELAY)
-
-        elif self.substate == "RepetitionPhase":
-            if self.timer_expired():
-                if self.run < self.REPETITIONS_MAX:
-                    self.send_offer_service()
-                    self.run += 1
-                    delay = self.REPETITIONS_BASE_DELAY * (2 ** self.run)
-                    print(f"Repetition {self.run}. Next delay: {delay:.2f} seconds")
-                    self.set_timer(delay)
-                else:
-                    self.transition_to_state("Ready", "MainPhase")
-                    self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
-            elif self.receive_find_service():
-                self.send_offer_service()
-                self.set_timer(self.REPETITIONS_BASE_DELAY)
-
-        elif self.substate == "MainPhase":
-            if self.timer_expired():
-                self.send_offer_service()
-                self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
-            elif self.receive_find_service():
-                self.send_offer_service()
-                self.reset_timer(self.CYCLIC_ANNOUNCE_DELAY)
+    def handle_initial(self):
+        """
+        Handle entry points of the state machine.
+        """
+        if not self.ifstatus_up_and_configured or not self.service_status_up:
+            self.state = "NotReady"
+        elif self.ifstatus_up_and_configured and self.service_status_up:
+            self.state = "Ready"
+            self.handle_initial_ready()
 
     def run_state_machine(self):
         """Run the state machine."""
+        self.handle_initial()
         while True:
             if self.state == "NotReady":
                 self.handle_not_ready()
-
             elif self.state == "Ready":
                 self.handle_ready()
 
             time.sleep(0.1)  # Small delay to prevent 100% CPU utilization
-
 
 # Example usage:
 server_state_machine = SomeIPServerStateMachine()
@@ -141,7 +182,7 @@ server_thread = threading.Thread(target=server_state_machine.run_state_machine, 
 server_thread.start()
 server_state_machine.ifstatus_up_and_configured = True  # Simulate network interface status
 server_state_machine.service_status_up = True  # Simulate service status
-time.sleep(20)  # Small delay to prevent 100% CPU utilization
+time.sleep(40)  # Small delay to prevent 100% CPU utilization
 server_state_machine.service_status_up = False # Simulate service status
 server_thread.join()
 
