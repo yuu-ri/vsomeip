@@ -137,7 +137,7 @@ class SomeIPServerStateMachine:
             self.send_stop_offer_service()
             self.clear_all_timers()
             print("Server: Transitioned to NotReady with StopOfferService.")
-        elif self.substate == "InitialWaitPhase":
+        if self.substate == "InitialWaitPhase":
             self.handle_initial_wait_phase()
         elif self.substate == "RepetitionPhase":
             self.handle_repetition_phase()
@@ -182,7 +182,7 @@ server_thread = threading.Thread(target=server_state_machine.run_state_machine, 
 server_thread.start()
 server_state_machine.ifstatus_up_and_configured = True  # Simulate network interface status
 server_state_machine.service_status_up = True  # Simulate service status
-time.sleep(40)  # Small delay to prevent 100% CPU utilization
+time.sleep(20)  # Small delay to prevent 100% CPU utilization
 server_state_machine.service_status_up = False # Simulate service status
 server_thread.join()
 
