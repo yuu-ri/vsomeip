@@ -12,7 +12,9 @@ class SomeIPClientStateMachine:
 
     def __init__(self, udp_ip="127.0.0.1", udp_port=30491):
         self.state = "NotRequested"
+        self.state = "Initial"  # Initial entry point
         self.substate = None
+        self.service_required = False
         self.udp_ip = udp_ip
         self.udp_port = udp_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -71,6 +73,9 @@ class SomeIPClientStateMachine:
         self.substate = substate
         print(f"Client: Transitioning to {state} {substate if substate else ''}")
 
+    def internal_service_request(self):
+        return True
+
     def handle_service_not_seen(self):
         """Handle ServiceNotSeen state."""
         if self.receive_offer_service():
@@ -85,11 +90,8 @@ class SomeIPClientStateMachine:
             self.transition_to_state("NotRequested", "ServiceNotSeen")
         elif self.receive_stop_offer_service():
             self.transition_to_state("NotRequested", "ServiceNotSeen")
-        elif self.ifstatus_up_and_configured:
+        elif self.internal_service_request() and self.ifstatus_up_and_configured:
             self.transition_to_state("Main", "ServiceReady")
-
-    def internal_service_request(self):
-        return True
 
     def handle_not_requested(self):
         """Handle the NotRequested state."""
@@ -100,7 +102,19 @@ class SomeIPClientStateMachine:
         elif self.internal_service_request() and not self.ifstatus_up_and_configured:
             self.transition_to_state("RequestedButNotReady")
 
-    def handle_searching_for_service(self):
+    def handle_repetition_phase(self):
+        """Handle RepetitionPhase state"""
+        if self.timer_expired():
+            if self.run < self.REPETITIONS_MAX:
+                self.send_find_service()
+                self.run += 1
+                self.set_timer(self.REPETITIONS_BASE_DELAY * (2 ** self.run))
+            else:
+                self.transition_to_state("Main", "Stopped")
+        elif self.receive_stop_offer_service():
+            self.transition_to_state("Main", "Stopped")
+
+    def handle_initial_wait_phase(self):
         """Handle transitions for SearchingForService state."""
         if self.substate == "InitialWaitPhase":
             if self.timer_expired():
@@ -109,19 +123,21 @@ class SomeIPClientStateMachine:
                 self.run = 0
                 self.set_timer(self.REPETITIONS_BASE_DELAY)
 
+    def handle_searching_for_service(self):
+        """Handle transitions for SearchingForService state."""
+        if self.substate == "InitialWaitPhase":
+            self.handle_initial_wait_phase()
+
         elif self.substate == "RepetitionPhase":
-            if self.timer_expired():
-                if self.run < self.REPETITIONS_MAX:
-                    self.send_find_service()
-                    self.run += 1
-                    delay = self.REPETITIONS_BASE_DELAY * (2 ** self.run)
-                    print(f"Repetition {self.run}. Next delay: {delay:.2f} seconds")
-                    self.set_timer(delay)
-                else:
-                    self.transition_to_state("Stopped")
-            elif self.receive_offer_service():
-                self.transition_to_state("Main", "ServiceReady")
-                self.set_timer(self.TTL)
+            self.handle_repetition_phase()
+
+        elif self.receive_offer_service():
+            self.set_timer(self.TTL)
+            self.transition_to_state("Main", "ServiceReady")
+
+        elif not self.ifstatus_up_and_configured:
+            self.cancel_timer()
+            self.transition_to_state("RequestedButNotReady")
 
     def handle_requested_but_not_ready(self):
         """Handle transitions for RequestedButNotReady state."""
@@ -131,30 +147,47 @@ class SomeIPClientStateMachine:
             self.set_timer(delay)
 
     def handle_stopped(self):
-        """Handle transitions for the Stopped state."""
-        if self.receive_offer_service():
-            print("Client: Received OfferService. Transitioning to Service Ready.")
-            self.transition_to_state("Main", "ServiceReady")
+        """Handle Stopped state"""
+        if not self.service_required:
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.receive_offer_service():
             self.reset_timer(self.TTL)
+            self.transition_to_state("Main", "ServiceReady")
+
+    def handle_service_ready(self):
+        """Handle ServiceReady substate"""
+        if not self.service_required:
+            self.transition_to_state("NotRequested", "ServiceSeen")
+        elif self.receive_offer_service():
+            self.reset_timer(self.TTL)
+        elif self.receive_stop_offer_service():
+            self.cancel_timer()
+            self.transition_to_state("Main", "Stopped")
+        elif self.timer_expired():
+            self.transition_to_state("SearchingForService")
 
     def handle_main_phase(self):
         """Handle transitions for the Main state."""
         if self.substate == "ServiceReady":
-            if self.timer_expired():
-                print("Client: TTL expired. Transitioning to Searching for Service.")
-                self.transition_to_state("SearchingForService", "InitialWaitPhase")
-                delay = random.uniform(self.INITIAL_DELAY_MIN, self.INITIAL_DELAY_MAX)
-                self.set_timer(delay)
-            elif self.receive_stop_offer_service():
-                self.transition_to_state("Stopped")
-            elif self.receive_offer_service():
-                self.reset_timer(self.TTL)
+            self.handle_service_ready()
         elif self.substate == "Stopped":
             self.handle_stopped()
+
+    def handle_initial_entry(self):
+        """Handle initial entry point transitions"""
+        if not self.service_required:
+            self.transition_to_state("NotRequested")
+        elif not self.ifstatus_up_and_configured:
+            self.transition_to_state("RequestedButNotReady")
+        elif self.service_required and self.ifstatus_up_and_configured:
+            self.transition_to_state("SearchingForService", "InitialWaitPhase")
 
     def run_state_machine(self):
         """Run the state machine."""
         while True:
+            if self.state == "Initial":
+                self.handle_initial_entry()
+
             if self.state == "NotRequested":
                 self.handle_not_requested()
 
