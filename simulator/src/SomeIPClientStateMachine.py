@@ -71,13 +71,33 @@ class SomeIPClientStateMachine:
         self.substate = substate
         print(f"Client: Transitioning to {state} {substate if substate else ''}")
 
+    def handle_service_not_seen(self):
+        """Handle ServiceNotSeen state."""
+        if self.receive_offer_service():
+            self.set_timer(self.TTL)
+            self.transition_to_state("NotRequested", "ServiceSeen")
+
+    def handle_service_seen(self):
+        """Handle ServiceSeen state."""
+        if not self.ifstatus_up_and_configured:
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.timer_expired():
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.receive_stop_offer_service():
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.ifstatus_up_and_configured:
+            self.transition_to_state("Main", "ServiceReady")
+
+    def internal_service_request(self):
+        return True
+
     def handle_not_requested(self):
         """Handle the NotRequested state."""
         if not self.service_seen:
-            self.transition_to_state("NotRequested", "ServiceNotSeen")
+            self.handle_service_not_seen()
         elif self.service_seen:
-            self.transition_to_state("NotRequested", "ServiceSeen")
-        if self.ifstatus_up_and_configured:
+            self.handle_service_seen()
+        elif self.internal_service_request() and not self.ifstatus_up_and_configured:
             self.transition_to_state("RequestedButNotReady")
 
     def handle_searching_for_service(self):
