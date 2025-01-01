@@ -11,7 +11,6 @@ class SomeIPClientStateMachine:
     TTL = 5  # Time-to-Live for a service announcement
 
     def __init__(self, udp_ip="127.0.0.1", udp_port=30491):
-        self.state = "NotRequested"
         self.state = "Initial"  # Initial entry point
         self.substate = None
         self.service_required = False
