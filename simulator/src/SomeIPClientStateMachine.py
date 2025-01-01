@@ -102,7 +102,7 @@ class SomeIPClientStateMachine:
             self.transition_to_state("RequestedButNotReady")
 
     def handle_repetition_phase(self):
-        """Handle RepetitionPhase state"""
+        """Handle RepetitionPhase substate."""
         if self.timer_expired():
             if self.run < self.REPETITIONS_MAX:
                 self.send_find_service()
@@ -187,7 +187,7 @@ class SomeIPClientStateMachine:
             if self.state == "Initial":
                 self.handle_initial_entry()
 
-            if self.state == "NotRequested":
+            elif self.state == "NotRequested":
                 self.handle_not_requested()
 
             elif self.state == "SearchingForService":
