@@ -6,6 +6,8 @@ SHELL ["/bin/bash", "-xec"]
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get install --no-install-recommends --yes \
+        iputils-ping \
+        net-tools \
         clang \
         cmake \
         g++ \
