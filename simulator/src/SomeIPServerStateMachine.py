@@ -22,6 +22,7 @@ class SomeIPServerStateMachine:
         self.run = 0
         self.ifstatus_up_and_configured = False  # Simulates the ifstatus condition
         self.service_status_up = False  # Simulates the service status
+        self.stop_event = threading.Event()
 
     def set_timer(self, delay):
         """Set a timer for the current state."""
@@ -167,7 +168,7 @@ class SomeIPServerStateMachine:
 
     def run_state_machine(self):
         """Run the state machine."""
-        while True:
+        while not self.stop_event.is_set():
             if self.state == "Initial":
                 self.handle_initial_entry()
             elif self.state == "NotReady":
@@ -176,6 +177,9 @@ class SomeIPServerStateMachine:
                 self.handle_ready()
 
             time.sleep(0.1)  # Small delay to prevent 100% CPU utilization
+
+    def stop(self):
+        self.stop_event.set()
 
 if __name__ == '__main__':
     # Example usage:
