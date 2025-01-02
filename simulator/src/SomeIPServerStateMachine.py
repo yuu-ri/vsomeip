@@ -93,7 +93,7 @@ class SomeIPServerStateMachine:
             self.state = "Ready"
             self.handle_initial_entry_ready()
 
-    def handle_initial_entry_wait_phase(self):
+    def handle_initial_wait_phase(self):
         """Handle the Initial Wait Phase substate."""
         if self.timer_expired():
             self.send_offer_service()
@@ -139,7 +139,7 @@ class SomeIPServerStateMachine:
             self.clear_all_timers()
             print("Server: Transitioned to NotReady with StopOfferService.")
         if self.substate == "InitialWaitPhase":
-            self.handle_initial_entry_wait_phase()
+            self.handle_initial_wait_phase()
         elif self.substate == "RepetitionPhase":
             self.handle_repetition_phase()
         elif self.substate == "MainPhase":
