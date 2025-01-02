@@ -116,6 +116,12 @@ class TestEventgroupPubSubStateMachine(unittest.TestCase):
         result = self.state_machine.receive_subscribe_eventgroup()
         self.assertTrue(result)
 
+    def test_receive_subscribe_eventgroup_timeout(self):
+        """Test receiving SubscribeEventgroup message with timeout"""
+        self.state_machine.sock.recvfrom = Mock(side_effect=socket.timeout)
+        result = self.state_machine.receive_subscribe_eventgroup()
+        self.assertFalse(result)
+
     def test_receive_stop_subscribe_eventgroup(self):
         """Test receiving StopSubscribeEventgroup message"""
         self.state_machine.sock.recvfrom = Mock(return_value=(b"StopSubscribeEventgroup", ("127.0.0.1", 30491)))
@@ -127,6 +133,19 @@ class TestEventgroupPubSubStateMachine(unittest.TestCase):
         self.state_machine.sock.recvfrom = Mock(side_effect=socket.timeout)
         result = self.state_machine.receive_stop_subscribe_eventgroup()
         self.assertFalse(result)
+
+    def test_run_state_machine_service_down(self):
+        """Test running the state machine with service down"""
+        self.state_machine.state = "Initial"
+        self.state_machine.service_status = "Down"
+        with patch.object(self.state_machine, 'handle_service_down') as mock_handle_service_down:
+            with patch('time.sleep', return_value=None):
+                thread = threading.Thread(target=self.state_machine.run_state_machine)
+                thread.start()
+                time.sleep(0.2)  # Allow some iterations
+                self.state_machine.stop()
+                thread.join()
+                mock_handle_service_down.assert_called()
 
     def test_run_state_machine(self):
         """Test running the state machine"""
