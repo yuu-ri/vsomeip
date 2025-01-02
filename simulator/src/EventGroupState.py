@@ -6,11 +6,9 @@ class EventgroupPubSubStateMachine:
 
     def __init__(self, udp_ip="127.0.0.1", udp_port=30490):
         # States
-        self.state = "ServiceDown"
+        self.state = "Initial"  # Start from Initial state
         self.substate = None
         self.service_status = "Down"
-        
-        # Subscription handling
         self.subscription_counter = 0
         self.timer = None
         
@@ -64,17 +62,26 @@ class EventgroupPubSubStateMachine:
             pass
         return False
 
+    def handle_initial_entry(self):
+        """Handle initial entry point transitions"""
+        if self.service_status == "Down":
+            self.transition_to_state("ServiceDown")
+        elif self.service_status == "Up":
+            self.transition_to_state("ServiceUp", "NotSubscribed")
+
     def handle_service_down(self):
+        """Handle ServiceDown state"""
         if self.service_status == "Up":
             self.transition_to_state("ServiceUp", "NotSubscribed")
 
     def handle_service_up(self):
+        """Handle ServiceUp state"""
         if self.service_status == "Down":
             self.transition_to_state("ServiceDown")
         elif self.substate == "NotSubscribed":
             if self.receive_subscribe_eventgroup():
-                self.send_subscribe_eventgroup_ack()
                 self.enable_events()
+                self.send_subscribe_eventgroup_ack()
                 self.transition_to_state("ServiceUp", "Subscribed")
                 self.set_timer(self.TTL)
         elif self.substate == "Subscribed":
@@ -95,7 +102,9 @@ class EventgroupPubSubStateMachine:
 
     def run_state_machine(self):
         while True:
-            if self.state == "ServiceDown":
+            if self.state == "Initial":
+                self.handle_initial_entry()
+            elif self.state == "ServiceDown":
                 self.handle_service_down()
             elif self.state == "ServiceUp":
                 self.handle_service_up()
