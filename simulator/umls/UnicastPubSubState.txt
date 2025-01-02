@@ -1,0 +1,41 @@
+Publish/Subscribe States (server behavior for unicast eventgroups) are defined as
+ follows:
+ Eventgroup_PubSub (Unicast Eventgroup)
+ – Service Down
+ – Service Up
+   Not Subscribed
+   Subscribed
+ Initial entry points of Eventgroup_PubSub (Unicast Eventgroup) are inside the
+ following states:
+ Eventgroup_PubSub (Unicast Eventgroup) 
+ – Service Up
+ Transitions inside Eventgroup_PubSub (Unicast Eventgroup) are defined as
+ follows:
+ FROM entry point Eventgroup_PubSub (Unicast Eventgroup)
+ TO Service Down
+ WITH [Service==Down]
+ FROM Service Down
+ TO Service Up
+ WITH ServiceUp
+ FROM Service Up
+ TO Service Down
+ WITH ServiceDown
+ FROM entry point Eventgroup_PubSub (Unicast Eventgroup)
+ TO Service UP
+ WITH [Service==Up]
+  FROM entry point Service Up
+ TO Not Subscribed
+ FROM Not Subscribed
+ TO Subscribed
+ WITH
+ receive(SubscribeEventgroup) /enableEvents()
+ send(SubscribeEventgroupAck)
+ FROM Subscribed
+ TO Subscribed
+ WITH receive(SubscribeEventgroup) /send(SubscribeEventgroupAck)
+ FROM Subscribed
+ TO Not Subscribed
+ WITH receive(StopSubscribeEventgroup) /disableEvents()
+ FROM Subscribed
+ TO Not Subscribed
+ WITH TTL_expired [SubscriptionCounter==1] /disableEvents()

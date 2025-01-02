@@ -1,0 +1,110 @@
+ Please check all the code based on the following state machine
+States inside SD Client State Machine(Service) are defined as follows:
+ SD Client State Machine(Service)
+ – Not Requested
+   Service Not Seen
+   Service Seen
+ – Requested_but_not_ready
+ – Main
+   Service Ready
+   Stopped
+ – Searching for Service
+   Initial Wait Phase
+     Timer Set
+   Repetition Phase
+     Timer Set
+ Initial entry points of SD Client State Machine(Service) are inside the follow
+ing states:
+ SD Client State Machine(Service)
+ – Not Requested
+   Searching for Service
+ – Initial Wait Phase
+ – Repetition Phase
+ Transitions inside SD Client State Machine(Service) are defined as follows:
+ FROM entry point SD Client State Machine(Service)
+ TO Not Requested
+ WITH [Service Not Requested]
+ FROM entry point SD Client State Machine(Service)
+ TO Requested_but_not_ready
+ WITH Service Not Requested and ifstatus!=up_and_configured
+ FROM entry point SD Client State Machine(Service)
+ TO Searching for Service
+ WITH Service Requested and ifstatus==up_and_configured
+ FROM entry point Not Requested TO Service Not Seen
+ FROM Not Requested TORequested_but_not_ready
+ WITH InternalServiceRequest [ifstatus!=up_and_configured]
+ FROM Service Not Seen
+ TO Service Seen
+ WITH receive(OfferService) /setTimer(TTL)
+ FROM Repetition Phase
+ TO Stopped
+ WITH Repetition Expired
+ FROM Repetition Phase
+ TO Stopped
+ WITH receive(StopOfferService)
+ FROM Stopped
+ TO Service Not Seen
+ WITH [ServiceNotRequested]
+ FROM Service Seen
+ TO Service Not Seen
+ WITH if-status-changed() [ifstatus!=up_and_configured]
+ FROM Service Seen
+ TO Service Not Seen
+ WITH Timer expired (TTL)
+ FROM Repetition Phase
+ TO Stopped
+ WITH Repetition Expired
+ FROM Service Seen
+ TO Service Not Seen
+ WITH receive(StopServiceOffer)
+ FROM Service Seen
+ TO Service Seen
+ FROM Service Seen
+ TO Service Ready
+ WITH InternalServiceRequest [ifstatus==up_and_configured]
+ FROM Service Ready
+ TO Service Seen
+ WITH [ServiceNotRequest]
+ FROM Service Ready
+ TO Service Ready
+ WITH receive(OfferService) /resetTimer(TTL)
+ FROM Service Ready
+ TO Stopped
+ WITH receive(StopOfferService) / cancelTimer(TTL)
+ FROM Stopped
+ TO Service Ready
+ WITH receive(OfferService) /resetTimer(TTL)
+ FROM Service Ready
+ TO Searching for Service
+ WITH Timer expired (TTL)
+ FROM Searching for Service
+ TO Service Ready
+ WITH receive(OfferService) /setTimer(TTL)
+ FROM Searching for Service
+ TO Requested_but_not_ready
+ WITH if-status-changed() [ifstatus!=up_and_configured] /cancel
+ Timer(TTL)
+ FROM Requested_but_not_ready
+ TO Searching for Service
+ WITH if-status-changed() [ifstatus!=up_and_configured]
+ FROM entry point Searching for Service
+ TO Initial Wait Phase
+ FROM entry point Initial Wait Phase
+ TO Timer Set
+ OF Initial Wait Phase
+ WITH /setTimerInRange(INITIAL_DELAY_MIN, INITIAL_DELAY_MAX)
+ FROM Timer Set
+ OF Initial Wait Phase
+ TO Repetition Phase
+ WITH TimerExpired /send(FindService)
+ FROM entry point Repetition Phase
+ TO Timer Set
+ OF Repetition Phase
+ WITH[REPETITONS_MAX>0] /run=0 setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+ FROM Timer Set
+ OF Repetition Phase
+ TO Timer Set
+ OF Repetition Phase
+ FROM Not Requested
+ TO Requested_but_not_ready
+ WITH InternalServiceRequest [ifstatus!=up_and_configured]
