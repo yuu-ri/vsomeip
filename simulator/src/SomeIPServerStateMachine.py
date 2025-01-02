@@ -86,6 +86,7 @@ class SomeIPServerStateMachine:
         """Handle the initial entry point for the MainPhase substate."""
         print("Server: Handling initial MainPhase.")
         self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
+        self.send_offer_service()
 
     def handle_not_ready(self):
         """Handle the Not Ready state."""
