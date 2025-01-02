@@ -1,6 +1,5 @@
-import time
 import socket
-
+import time
 
 class EventgroupPubSubStateMachine:
     TTL = 5  # Time-to-Live for subscriptions
@@ -36,6 +35,35 @@ class EventgroupPubSubStateMachine:
         print("Events disabled")
         self.subscription_counter -= 1
 
+    def receive_subscribe_eventgroup(self):
+        """Receive SubscribeEventgroup message."""
+        try:
+            data, addr = self.sock.recvfrom(1024)
+            if data.decode() == "SubscribeEventgroup":
+                print("Received SubscribeEventgroup")
+                self.send_subscribe_eventgroup_ack()
+                return True
+        except socket.timeout:
+            pass
+        return False
+
+    def send_subscribe_eventgroup_ack(self):
+        """Send SubscribeEventgroupAck message."""
+        message = "SubscribeEventgroupAck"
+        self.sock.sendto(message.encode(), ("127.0.0.1", 30491))
+        print("Sent SubscribeEventgroupAck")
+
+    def receive_stop_subscribe_eventgroup(self):
+        """Receive StopSubscribeEventgroup message."""
+        try:
+            data, addr = self.sock.recvfrom(1024)
+            if data.decode() == "StopSubscribeEventgroup":
+                print("Received StopSubscribeEventgroup")
+                return True
+        except socket.timeout:
+            pass
+        return False
+
     def handle_service_down(self):
         if self.service_status == "Up":
             self.transition_to_state("ServiceUp", "NotSubscribed")
@@ -45,8 +73,8 @@ class EventgroupPubSubStateMachine:
             self.transition_to_state("ServiceDown")
         elif self.substate == "NotSubscribed":
             if self.receive_subscribe_eventgroup():
-                self.enable_events()
                 self.send_subscribe_eventgroup_ack()
+                self.enable_events()
                 self.transition_to_state("ServiceUp", "Subscribed")
                 self.set_timer(self.TTL)
         elif self.substate == "Subscribed":
@@ -72,9 +100,3 @@ class EventgroupPubSubStateMachine:
             elif self.state == "ServiceUp":
                 self.handle_service_up()
             time.sleep(0.1)
-
-# Example usage:
-pubsub_state_machine = EventgroupPubSubStateMachine()
-pubsub_state_machine.service_status_up = True  # Simulate service up
-pubsub_state_machine.run_state_machine()
-
