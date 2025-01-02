@@ -1,5 +1,6 @@
 import socket
 import time
+import threading
 
 class EventgroupPubSubStateMachine:
     TTL = 5  # Time-to-Live for subscriptions
@@ -18,6 +19,9 @@ class EventgroupPubSubStateMachine:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.udp_ip, self.udp_port))
         self.sock.settimeout(0.1)
+        
+        # Thread control
+        self.stop_event = threading.Event()
 
     def set_timer(self, delay):
         self.timer = time.time() + delay
@@ -101,7 +105,7 @@ class EventgroupPubSubStateMachine:
         print(f"Transitioning to {state} {substate if substate else ''}")
 
     def run_state_machine(self):
-        while True:
+        while not self.stop_event.is_set():
             if self.state == "Initial":
                 self.handle_initial_entry()
             elif self.state == "ServiceDown":
@@ -109,3 +113,6 @@ class EventgroupPubSubStateMachine:
             elif self.state == "ServiceUp":
                 self.handle_service_up()
             time.sleep(0.1)
+
+    def stop(self):
+        self.stop_event.set()
