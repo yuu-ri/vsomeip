@@ -191,5 +191,52 @@ class TestSomeIPServerStateMachine(unittest.TestCase):
                 mock_stop.assert_called_once()
                 self.assertEqual(self.state_machine.state, "NotReady")
 
+    def test_run_state_machine(self):
+        """Test running the state machine"""
+        self.state_machine.state = "Initial"
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.service_status_up = True
+        thread = threading.Thread(target=self.state_machine.run_state_machine)
+        thread.daemon = True
+        thread.start()
+        time.sleep(0.2)
+        assert(self.state_machine.state == "Ready")
+        time.sleep(20)
+        self.state_machine.ifstatus_up_and_configured = False 
+        time.sleep(5)
+        assert(self.state_machine.state == "NotReady")
+        self.state_machine.stop()
+        thread.join(timeout=0.1)
+
+    def test_handle_repetition_phase_complete(self):
+        """Test all repetition phase scenarios"""
+        self.state_machine.state = "Ready"
+        self.state_machine.substate = "RepetitionPhase"
+
+        # Test FindService reception
+        with patch.object(self.state_machine, 'receive_find_service', return_value=True):
+            with patch.object(self.state_machine, 'wait_and_send_offer_service') as mock_send:
+                self.state_machine.handle_repetition_phase()
+                mock_send.assert_called_once()
+
+        # Test timer expiration with run < REPETITIONS_MAX
+        self.state_machine.timer = time.time() - 1
+        self.state_machine.run = 0
+        with patch.object(self.state_machine, 'send_offer_service') as mock_send:
+            with patch.object(self.state_machine, 'receive_find_service', return_value=False):
+                self.state_machine.handle_repetition_phase()
+                mock_send.assert_called_once()
+
+    def test_receive_find_service_complete(self):
+        """Test find service reception"""
+        # Test successful reception
+        mock_data = (b"FindService", ("127.0.0.1", 30491))
+        self.state_machine.sock.recvfrom.return_value = mock_data
+        self.assertTrue(self.state_machine.receive_find_service())
+    
+        # Test timeout
+        self.state_machine.sock.recvfrom.side_effect = socket.timeout
+        self.assertFalse(self.state_machine.receive_find_service())
+
 if __name__ == '__main__':
     unittest.main()

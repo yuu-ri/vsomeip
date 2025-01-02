@@ -158,23 +158,29 @@ class SomeIPServerStateMachine:
         return False
 
     def handle_initial_entry(self):
+        print("---LY---")
         """
         Handle entry points of the state machine.
         """
+        print(self.ifstatus_up_and_configured, self.service_status_up)
         if not self.ifstatus_up_and_configured or not self.service_status_up:
             self.state = "NotReady"
         elif self.ifstatus_up_and_configured and self.service_status_up:
             self.state = "Ready"
+            print("handle_initial_entry_ready")
             self.handle_initial_entry_ready()
 
     def run_state_machine(self):
-        """Run the state machine."""
+        print("""Run the state machine.""")
         while not self.stop_event.is_set():
             if self.state == "Initial":
+                print("handle_initial_entry")
                 self.handle_initial_entry()
             elif self.state == "NotReady":
+                print("handle_not_ready")
                 self.handle_not_ready()
             elif self.state == "Ready":
+                print("handle_ready")
                 self.handle_ready()
 
             time.sleep(0.1)  # Small delay to prevent 100% CPU utilization
