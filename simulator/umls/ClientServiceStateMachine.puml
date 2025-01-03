@@ -23,7 +23,7 @@ state NotRequested {
   }
 }
 
-state "Requested but Not Ready" {
+state RequestedButNotReady {
   [*] --> SearchingForService : ServiceRequested\nand if-status=up_and_configured
 
   SearchingForService --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
@@ -61,8 +61,7 @@ state Main {
   Stopped --> ServiceReady : InternalServiceRequest\n[if status=up_and_configured]
 }
 
-NotRequested --> "Requested but Not Ready" : ServiceRequested\nand if-status=up_and_configured
+NotRequested --> RequestedButNotReady : ServiceRequested\nand if-status=up_and_configured
 Main --> NotRequested : [ServiceNotRequested]
 
 @enduml
-
