@@ -20,7 +20,7 @@ ing states:
  TO Not Ready
  WITH [ifstatus!=up_and_configured or service-status==down]
  FROM entry point SD Server State Machine(Service)
- TO Not Ready
+ TO Ready
  WITH [ifstatus==up_and_configured or service-status==up]
  FROM Not Ready
  TO Ready
@@ -33,15 +33,9 @@ tus==up_and_configured and service-status==up]
 Timers()
  FROM Ready
  TO Not Ready
- WITH
- send(StopOfferService)
+ WITH service-status==down /clearAllTimers() send(StopOfferService)
  FROM TimerSet
  OF Initial Wait Phase
- 70 of 119
- service-status==down /clearAllTimers()
- Document ID 802: AUTOSAR_FO_PRS_SOMEIPServiceDiscoveryProtocol
-SOME/IP Service Discovery Protocol Specification
- AUTOSAR FOR24-11
  TO Repetition Phase
  WITH Timer expired /send(OfferService)
  FROM TimerSet
@@ -49,8 +43,7 @@ SOME/IP Service Discovery Protocol Specification
  TO TimerSet
  OF Repetition Phase
  WITH
- receive(FindService) /waitAndSend(OfferService) Reset
-Timer()
+ receive(FindService) /waitAndSend(OfferService) ResetTimer()
  FROM TimerSet
  OF Repetition Phase
  TO TimerSet
@@ -91,5 +84,4 @@ Timer()
  TO Timer Set
  OF Main Phase
  WITH
- receive(FindService) /waitAndSend(OfferService) reset
-Timer()
+ receive(FindService) /waitAndSend(OfferService) resetTimer()
