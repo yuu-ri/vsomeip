@@ -4,32 +4,31 @@ skinparam state {
   BorderColor Black
 }
 
-[*] --> NotRequested : Initial
+[*] --> NotRequested : [Service Not Requested]
+[*] --> RequestedButNotReady : [Requested and ifstatus!=up_and_configured]
+[*] --> SearchingForService : ServiceRequested\nand if-status=up_and_configured
 
 state NotRequested {
   [*] --> ServiceNotSeen
   
-  state ServiceNotSeen {
-    [*] --> Initial
-    Initial --> ServiceSeen : receive(OfferService)\ngetTimer(TTL)
-    Initial --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
-    Initial --> NotRequested : Timer expired (TTL)\nreceive(StopServiceOffer)
-  }
+  state ServiceNotSeen
+  ServiceNotSeen --> ServiceSeen : receive(OfferService) /setTimer(TTL)
 
-  state ServiceSeen {
-    [*] --> Initial
-    Initial --> ServiceSeen : receive(ServiceOffer)\nresetTimer(TTL)
-    Initial --> ServiceNotSeen : Timer expired (TTL)
-  }
+  state ServiceSeen 
+  ServiceSeen --> ServiceNotSeen : if-status-changed() [ifstatus!=up_and_configured]
+  ServiceSeen --> ServiceNotSeen : Timer expired (TTL)
+  ServiceSeen --> ServiceNotSeen : receive(StopServiceOffer)
+  ServiceSeen --> ServiceSeen : receive(OfferService) /setTimer(TTL)
+  ServiceSeen --> ServiceReady : InternalServiceRequest [ifstatus==up_and_configured]
 }
 
-state RequestedButNotReady {
-  [*] --> SearchingForService : ServiceRequested\nand if-status=up_and_configured
+NotRequested --> RequestedButNotReady : InternalServiceRequest [ifstatus==up_and_configured]
 
-  SearchingForService --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
-  SearchingForService --> Main : [ServiceReady]
+state RequestedButNotReady
 
-  state SearchingForService {
+RequestedButNotReady --> SearchingForService :  if-status-changed() [ifstatus!=up_and_configured]
+
+state SearchingForService {
     [*] --> InitialWaitPhase
     
     state InitialWaitPhase {
@@ -38,30 +37,25 @@ state RequestedButNotReady {
     }
     
     state RepetitionPhase {
-      [*] --> TimerSet : /run=0\nsetTimer(2^run * REPETITIONS_BASE_DELAY)
-      TimerSet --> RepetitionPhase : Timer expired\nsend(FindService)\nrun++\nsetTimer(2^run * REPETITIONS_BASE_DELAY) [run < REPETITIONS_MAX]
-      TimerSet --> RepetitionExpired : Timer expired\n[run=REPETITIONS_MAX]
+      [*] --> TimerSet : [REPETITONS_MAX>0] /run=0 \n setTimer(2^run * REPETITIONS_BASE_DELAY)
+      TimerSet --> RepetitionPhase : Timer expired[run < REPETITIONS_MAX] \n send(FindService) \n run++ \n setTimer(2^run * REPETITIONS_BASE_DELAY)
     }
-    
-    RepetitionExpired --> NotRequested : receive(StopOfferService)
-  }
+    RepetitionPhase --> Stopped: Repetition expired \n [run>=REPETITIONS_MAX]
+    RepetitionPhase --> Stopped: WITH receive(StopOfferService)
 }
+
+SearchingForService --> RequestedButNotReady: if-status-changed() [ifstatus!=up_and_configured] /cancelTimer(TTL)
+
+SearchingForService --> ServiceReady : receive(OfferService) \n setTimer(TTL)
 
 state Main {
-  [*] --> ServiceReady
-
-  state ServiceReady {
-    [*] --> Initial
-    Initial --> Stopped : receive(StopOfferService)\n/cancelTimer(TTL)
-    Initial --> ServiceReady : receive(OfferService)\nresetTimer(TTL)
-    Initial --> NotRequested : if-status-changed()\n[if status!=up_and_configured]
-    Initial --> NotRequested : Timer expired (TTL)
-  }
-  
-  Stopped --> ServiceReady : InternalServiceRequest\n[if status=up_and_configured]
+  state ServiceReady
+  ServiceReady --> ServiceReady : receive(OfferService) \n resetTimer(TTL)
+  ServiceReady --> SearchingForService : Timer expired (TTL)
+  ServiceReady --> ServiceSeen : [ServiceNotRequested]
+  ServiceReady --> Stopped : receive(StopOfferService) /cancelTimer(TTL)
+  state Stopped 
+  Stopped --> ServiceReady : receive(OfferService) \n resetTimer(TTL)
+  Stopped --> ServiceNotSeen : [ServiceNotRequested]
 }
-
-NotRequested --> RequestedButNotReady : ServiceRequested\nand if-status=up_and_configured
-Main --> NotRequested : [ServiceNotRequested]
-
 @enduml
