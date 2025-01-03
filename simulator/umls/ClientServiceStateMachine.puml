@@ -40,7 +40,7 @@ state SearchingForService {
     state RepetitionPhase {
       state TimerSet2
       [*] --> TimerSet2 : [REPETITONS_MAX>0] /run=0 \n setTimer(2^run * REPETITIONS_BASE_DELAY)
-      TimerSet2 --> RepetitionPhase : Timer expired[run < REPETITIONS_MAX] \n send(FindService) \n run++ \n setTimer(2^run * REPETITIONS_BASE_DELAY)
+      TimerSet2 --> TimerSet2 : Timer expired[run < REPETITIONS_MAX] \n send(FindService) \n run++ \n setTimer(2^run * REPETITIONS_BASE_DELAY)
     }
     RepetitionPhase --> Stopped: Repetition expired \n [run>=REPETITIONS_MAX]
     RepetitionPhase --> Stopped: WITH receive(StopOfferService)
