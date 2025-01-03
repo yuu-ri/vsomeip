@@ -22,7 +22,7 @@ state NotRequested {
   ServiceSeen --> ServiceReady : InternalServiceRequest [ifstatus==up_and_configured]
 }
 
-NotRequested --> RequestedButNotReady : InternalServiceRequest [ifstatus==up_and_configured]
+NotRequested --> RequestedButNotReady : InternalServiceRequest [ifstatus!=up_and_configured]
 
 state RequestedButNotReady
 

@@ -71,8 +71,14 @@ class ClientServiceStateMachine:
         print(f"Client: Transitioning to {state} {substate if substate else ''}")
 
     def handle_not_requested(self):
-        if self.ifstatus_up_and_configured:
-            self.transition_to_state("RequestedButNotReady")
+        print(f"handle_not_requested:{self.service_requested}, {self.ifstatus_up_and_configured}")
+        if self.service_requested:
+            if not self.ifstatus_up_and_configured:
+                self.transition_to_state("RequestedButNotReady")
+            else:
+                self.transition_to_state("NotRequested")
+        else:
+            self.transition_to_state("NotRequested")
 
     def handle_requested_but_not_ready(self):
         if self.ifstatus_up_and_configured:
@@ -102,17 +108,19 @@ class ClientServiceStateMachine:
             self.transition_to_state("Stopped")
 
     def handle_searching_for_service(self):
+        if not self.ifstatus_up_and_configured:
+            self.cancel_timer()
+            self.transition_to_state("RequestedButNotReady")
+            return
+        if self.receive_offer_service():
+            self.set_timer(self.TTL)
+            self.transition_to_state("ServiceReady")
         if self.substate == "InitialWaitPhase":
             self.handle_initial_wait_phase()
         elif self.substate == "RepetitionPhase":
             self.handle_repetition_phase()
 
-        if self.receive_offer_service():
-            self.set_timer(self.TTL)
-            self.transition_to_state("ServiceReady")
-        elif not self.ifstatus_up_and_configured:
-            self.cancel_timer()
-            self.transition_to_state("RequestedButNotReady")
+
 
     def handle_service_ready(self):
         if self.receive_offer_service():
@@ -127,6 +135,13 @@ class ClientServiceStateMachine:
             self.cancel_timer()
             self.transition_to_state("Stopped")
 
+    def handle_stopped(self):
+        if not self.service_requested:
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.receive_offer_service():
+            self.reset_timer(self.TTL)
+            self.transition_to_state("ServiceReady")
+
     def run_state_machine(self):
         while not self.stop_event.is_set():
             if self.state == "NotRequested":
@@ -137,19 +152,9 @@ class ClientServiceStateMachine:
                 self.handle_searching_for_service()
             elif self.state == "ServiceReady":
                 self.handle_service_ready()
+            elif self.state == "Stopped":
+                self.handle_stopped()
             time.sleep(0.1)
 
     def stop(self):
         self.stop_event.set()
-
-# Example usage
-if __name__ == "__main__":
-    state_machine = ClientServiceStateMachine()
-    state_machine.ifstatus_up_and_configured = True
-
-    thread = threading.Thread(target=state_machine.run_state_machine)
-    thread.start()
-
-    time.sleep(5)
-    state_machine.stop()
-    thread.join()
