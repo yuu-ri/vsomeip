@@ -5,34 +5,35 @@ skinparam state {
 }
 
 [*] --> NotReady : [ifstatus!=up_and_configured or service-status==down]
-[*] --> Ready : [ifstatus==up_and_configured or service-status==up]
+[*] --> Ready : [ifstatus==up_and_configured and service-status==up]
 
 state NotReady
 NotReady --> Ready : if-status-changed() or service-status-changed() [ifstatus==up_and_configured and service-status==up]
+
+Ready --> NotReady : if-status-changed [ifstatus!=up_and_configured] / clearAllTimers()
+Ready --> NotReady : service-status==down /clearAllTimers() \n send(StopOfferService)
 
 state Ready {
   [*] --> InitialWaitPhase
 
   state InitialWaitPhase {
-    [*] --> TimerSet
-    TimerSet --> RepetitionPhase : Timer expired
+    [*] --> TimerSet: SetTimerInRange(INITIAL_DELAY_MIN,INITIAL_DELAY_MAX)
+    TimerSet --> RepetitionPhase : Timer expired /send(OfferService)
   }
 
   state RepetitionPhase {
-    [*] --> TimerSet
-    TimerSet --> RepetitionPhase : Timer expired [run<REPETITIONS_MAX] / send(OfferService) run++ setTimer((2^run)*REPETITIONS_BASE_DELAY)
+    [*] --> TimerSet :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
+    TimerSet --> RepetitionPhase : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
     TimerSet --> MainPhase : Timer expired [run==REPETITIONS_MAX]
-    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) resetTimer()
+    [*] --> MainPhase : [REPETITIONS_MAX==0]
   }
 
   state MainPhase {
-    [*] --> TimerSet
-    TimerSet --> TimerSet : Timer expired / setTimer(CYCLIC_ANNOUNCE_DELAY) send(OfferService)
-    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) resetTimer()
+    [*] --> TimerSet : /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+    TimerSet --> TimerSet : Timer expired / setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
   }
-
-  Ready --> NotReady : if-status-changed [ifstatus!=up_and_configured] / clearAllTimers()
-  Ready --> NotReady : send(StopOfferService)
 }
 
 @enduml

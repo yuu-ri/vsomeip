@@ -19,69 +19,75 @@ ing states:
  FROM entry point SD Server State Machine(Service)
  TO Not Ready
  WITH [ifstatus!=up_and_configured or service-status==down]
+
  FROM entry point SD Server State Machine(Service)
  TO Ready
- WITH [ifstatus==up_and_configured or service-status==up]
+ WITH [ifstatus==up_and_configured and service-status==up]
+
  FROM Not Ready
  TO Ready
- WITH
- if-status-changed() or service-status-changed() [ifsta
-tus==up_and_configured and service-status==up]
+ WITH if-status-changed() or service-status-changed() [ifstatus==up_and_configured and service-status==up]
+
  FROM Ready
  TO Not Ready
- WITH if-status-changed [ifstatus!=up_and_configured] /clearAll
-Timers()
+ WITH if-status-changed [ifstatus!=up_and_configured] /clearAllTimers()
+
  FROM Ready
  TO Not Ready
- WITH service-status==down /clearAllTimers() send(StopOfferService)
- FROM TimerSet
- OF Initial Wait Phase
- TO Repetition Phase
- WITH Timer expired /send(OfferService)
- FROM TimerSet
- OF Repetition Phase
- TO TimerSet
- OF Repetition Phase
- WITH
- receive(FindService) /waitAndSend(OfferService) ResetTimer()
- FROM TimerSet
- OF Repetition Phase
- TO TimerSet
- OF Repetition Phase
- WITH
- Timer expired [run<REPETITIONS_MAX] /send(OfferService)
- run++ setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
- FROM TimerSet
- OF Repetition Phase
- TO Main Phase
- WITH Timer expired [run==REPETITIONS_MAX]
+ WITH service-status==down /clearAllTimers() \n send(StopOfferService)
+
  FROM entry point Ready
  TO Initial Wait Phase
+
  FROM entry point Initial Wait Phase
  TO Timer Set
  OF Initial Wait Phase
  WITH SetTimerInRange(INITIAL_DELAY_MIN,INITIAL_DELAY_MAX)
+
+ FROM TimerSet
+ OF Initial Wait Phase
+ TO Repetition Phase
+ WITH Timer expired /send(OfferService)
+
  FROM entry point Repetition Phase
  TO Timer Set
  OF Repetition Phase
- WITH[REPETITIONS_MAX>0] /run=0 setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+ WITH[REPETITIONS_MAX>0] /run=0 \n setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+
+ FROM TimerSet
+ OF Repetition Phase
+ TO TimerSet
+ OF Repetition Phase
+ WITH receive(FindService) /waitAndSend(OfferService) \n ResetTimer()
+
+ FROM TimerSet
+ OF Repetition Phase
+ TO TimerSet
+ OF Repetition Phase
+ WITH Timer expired [run<REPETITIONS_MAX] /send(OfferService) \n run++ \n setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+
+ FROM TimerSet
+ OF Repetition Phase
+ TO Main Phase
+ WITH Timer expired [run==REPETITIONS_MAX]
+
  FROM entry point Repetition Phase
  TO Main Phase
  WITH [REPETITIONS_MAX==0]
+
  FROM entry point Main Phase
  TO Timer Set
  OF Main Phase
- WITH /setTimer(CYCLIC_ANNOUNCE_DELAY) send(OfferService)
+ WITH /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+
  FROM Timer Set
  OF Main Phase
  TO Timer Set
  OF Main Phase
- WITH
- Timer expired /setTimer(CYCLIC_ANNOUNCE_DELAY)
- send(OfferService)
+ WITH Timer expired /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+
  FROM Timer Set
  OF Main Phase
  TO Timer Set
  OF Main Phase
- WITH
- receive(FindService) /waitAndSend(OfferService) resetTimer()
+ WITH receive(FindService) /waitAndSend(OfferService) \n resetTimer()
