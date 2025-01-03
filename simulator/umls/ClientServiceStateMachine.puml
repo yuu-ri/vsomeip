@@ -32,11 +32,13 @@ state SearchingForService {
     [*] --> InitialWaitPhase
     
     state InitialWaitPhase {
+      state TimerSet
       [*] --> TimerSet : /setTimerInRange(INITIAL_DELAY_MIN, INITIAL_DELAY_MAX)
       TimerSet --> RepetitionPhase : Timer expired\nsend(FindService)
     }
     
     state RepetitionPhase {
+      state TimerSet
       [*] --> TimerSet : [REPETITONS_MAX>0] /run=0 \n setTimer(2^run * REPETITIONS_BASE_DELAY)
       TimerSet --> RepetitionPhase : Timer expired[run < REPETITIONS_MAX] \n send(FindService) \n run++ \n setTimer(2^run * REPETITIONS_BASE_DELAY)
     }

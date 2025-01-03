@@ -17,11 +17,13 @@ state Ready {
   [*] --> InitialWaitPhase
 
   state InitialWaitPhase {
+    state TimerSet
     [*] --> TimerSet: SetTimerInRange(INITIAL_DELAY_MIN,INITIAL_DELAY_MAX)
     TimerSet --> RepetitionPhase : Timer expired /send(OfferService)
   }
 
   state RepetitionPhase {
+    state TimerSet
     [*] --> TimerSet :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
     TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
     TimerSet --> TimerSet : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
@@ -30,6 +32,7 @@ state Ready {
   }
 
   state MainPhase {
+    state TimerSet
     [*] --> TimerSet : /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
     TimerSet --> TimerSet : Timer expired / setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
     TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
