@@ -22,9 +22,9 @@ state Ready {
   }
 
   state RepetitionPhase {
-    [*] --> TimerSet :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2ˆ run)*REPETITIONS_BASE_DELAY)
+    [*] --> TimerSet :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
     TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
-    TimerSet --> RepetitionPhase : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
+    TimerSet --> TimerSet : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
     TimerSet --> MainPhase : Timer expired [run==REPETITIONS_MAX]
     [*] --> MainPhase : [REPETITIONS_MAX==0]
   }
