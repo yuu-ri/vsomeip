@@ -17,25 +17,25 @@ state Ready {
   [*] --> InitialWaitPhase
 
   state InitialWaitPhase {
-    state TimerSet
-    [*] --> TimerSet: SetTimerInRange(INITIAL_DELAY_MIN,INITIAL_DELAY_MAX)
-    TimerSet --> RepetitionPhase : Timer expired /send(OfferService)
+    state TimerSet1
+    [*] --> TimerSet1: SetTimerInRange(INITIAL_DELAY_MIN,INITIAL_DELAY_MAX)
+    TimerSet1 --> RepetitionPhase : Timer expired /send(OfferService)
   }
 
   state RepetitionPhase {
-    state TimerSet
-    [*] --> TimerSet :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
-    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
-    TimerSet --> TimerSet : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
-    TimerSet --> MainPhase : Timer expired [run==REPETITIONS_MAX]
+    state TimerSet2
+    [*] --> TimerSet2 :  [REPETITIONS_MAX>0] /run=0 \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
+    TimerSet2 --> TimerSet2 : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
+    TimerSet2 --> TimerSet2 : Timer expired [run<REPETITIONS_MAX] / send(OfferService) \n run++ \n setTimer((2^run)*REPETITIONS_BASE_DELAY)
+    TimerSet2 --> MainPhase : Timer expired [run==REPETITIONS_MAX]
     [*] --> MainPhase : [REPETITIONS_MAX==0]
   }
 
   state MainPhase {
-    state TimerSet
-    [*] --> TimerSet : /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
-    TimerSet --> TimerSet : Timer expired / setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
-    TimerSet --> TimerSet : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
+    state TimerSet3
+    [*] --> TimerSet3 : /setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+    TimerSet3 --> TimerSet3 : Timer expired / setTimer(CYCLIC_ANNOUNCE_DELAY) \n send(OfferService)
+    TimerSet3 --> TimerSet3 : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
   }
 }
 
