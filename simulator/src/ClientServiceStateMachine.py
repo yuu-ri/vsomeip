@@ -95,6 +95,12 @@ class ClientServiceStateMachine:
             self.internal_service_request()
             self.transition_to_state("Main", "ServiceReady")
 
+    def handle_service_not_seen(self):
+        """Handle ServiceNotSeen state."""
+        if self.receive_offer_service():
+            self.set_timer(self.TTL)
+            self.transition_to_state("NotRequested", "ServiceSeen")
+
     def handle_not_requested(self):
         print("""Handle the NotRequested state.""")
         if self.service_requested and not self.ifstatus_up_and_configured:
