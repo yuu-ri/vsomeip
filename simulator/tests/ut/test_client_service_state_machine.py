@@ -456,9 +456,9 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.state = "NotRequested"
         self.state_machine.substate = "ServiceSeen"
 
-        # UML: ServiceSeen --> ServiceNotSeen : [receive(StopServiceOffer)]
+        # UML: ServiceSeen --> ServiceNotSeen : [receive(Offer)]
         self.state_machine.set_timer(0.1)
-        self.state_machine.sock.recvfrom.side_effect = [(b"StopServiceOffer", ("127.0.0.1", 30491)), (b"StopServiceOffer", ("127.0.0.1", 30491))]
+        self.state_machine.sock.recvfrom.side_effect = [(b"Offer", ("127.0.0.1", 30491)), (b"StopOfferService", ("127.0.0.1", 30491))]
         self.state_machine.handle_service_seen()
         self.assertEqual(self.state_machine.substate, "ServiceNotSeen")
 
