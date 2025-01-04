@@ -53,6 +53,8 @@ class ClientServiceStateMachine:
                 return True
         except socket.timeout:
             pass
+        except Exception as e:
+            print(f"Client: Error receiving offer service: {e}") 
         return False
 
     def receive_stop_offer_service(self):
@@ -63,6 +65,8 @@ class ClientServiceStateMachine:
                 return True
         except socket.timeout:
             pass
+        except Exception as e:
+            print(f"Client: Error receiving stop offer service: {e}")      
         return False
 
     def transition_to_state(self, state, substate=None):
