@@ -58,13 +58,15 @@ class ClientServiceStateMachine:
         return False
 
     def receive_stop_offer_service(self):
+        print("Client: Receiving stop offer service")
         try:
             data, addr = self.sock.recvfrom(1024)
+            print(data)
             if data.decode() == "StopOfferService":
                 print("Client: Received StopOfferService")
                 return True
         except socket.timeout:
-            pass
+            print(f"Client: Warning receiving stop offer service timeout")
         except Exception as e:
             print(f"Client: Error receiving stop offer service: {e}")      
         return False
@@ -85,15 +87,19 @@ class ClientServiceStateMachine:
 
     def handle_service_seen(self):
         """Handle ServiceSeen state."""
+        if self.receive_offer_service():
+            self.set_timer(TTL)
+            self.substate = "ServiceSeen"
         if not self.ifstatus_up_and_configured:
             self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.service_requested and self.ifstatus_up_and_configured:
+            self.transition_to_state("Main", "ServiceReady")
         elif self.timer_expired():
             self.transition_to_state("NotRequested", "ServiceNotSeen")
         elif self.receive_stop_offer_service():
             self.transition_to_state("NotRequested", "ServiceNotSeen")
-        elif self.ifstatus_up_and_configured:
-            self.internal_service_request()
-            self.transition_to_state("Main", "ServiceReady")
+    # Correctly set the substate to ServiceSeen
+
 
     def handle_service_not_seen(self):
         """Handle ServiceNotSeen state."""
