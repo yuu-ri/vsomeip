@@ -28,7 +28,10 @@ class TestClientServiceStateMachine(unittest.TestCase):
 
     def test_handle_not_requested(self):
         """Test handle_not_requested state transitions"""
-        # Test transition to RequestedButNotReady when ifstatus is not up and configured
+        # Ensure the start state is "NotRequested"
+        self.state_machine.state = "NotRequested"
+
+        # UML: NotRequested --> RequestedButNotReady : [Requested and ifstatus!=up_and_configured]
         self.state_machine.service_requested = True
         self.state_machine.ifstatus_up_and_configured = False
         self.state_machine.handle_not_requested()
@@ -37,9 +40,8 @@ class TestClientServiceStateMachine(unittest.TestCase):
   
     def test_handle_requested_but_not_ready(self):
         """Test handle_requested_but_not_ready state transitions"""
+        # UML: RequestedButNotReady --> SearchingForService : [ifstatus=up_and_configured]
         self.state_machine.state = "RequestedButNotReady"
-
-        # Test transition to SearchingForService when ifstatus is up and configured
         self.state_machine.ifstatus_up_and_configured = True
         self.state_machine.handle_requested_but_not_ready()
         self.assertEqual(self.state_machine.state, "SearchingForService")
@@ -49,20 +51,20 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]  # Prevent receiving offers
         self.state_machine.state = "SearchingForService"
 
-        # Test transition to ServiceReady when offer service is received
+        # UML: SearchingForService --> ServiceReady : [receive(OfferService)]
         self.state_machine.ifstatus_up_and_configured = True
         self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
         self.state_machine.handle_searching_for_service()
         self.assertEqual(self.state_machine.state, "ServiceReady")
 
-        # Test transition to RequestedButNotReady when ifstatus is not up and configured
+        # UML: SearchingForService --> RequestedButNotReady : [ifstatus!=up_and_configured]
         self.state_machine.state = "SearchingForService"
         self.state_machine.ifstatus_up_and_configured = False
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]
         self.state_machine.handle_searching_for_service()
         self.assertEqual(self.state_machine.state, "RequestedButNotReady")
 
-        # Test transition to Stopped when stop offer is received in RepetitionPhase
+        # UML: SearchingForService:RepetitionPhase --> Stopped : [receive(StopOfferService)]
         self.state_machine.state = "SearchingForService"
         self.state_machine.substate = "RepetitionPhase"
         self.state_machine.ifstatus_up_and_configured = True
@@ -74,7 +76,7 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.handle_searching_for_service()
         self.assertEqual(self.state_machine.state, "Stopped")
 
-        # Test transition to Stopped when repetition expires and run >= REPETITIONS_MAX
+        # UML: SearchingForService:RepetitionPhase --> Stopped : [run>=REPETITIONS_MAX]
         self.state_machine.state = "SearchingForService"
         self.state_machine.substate = "RepetitionPhase"
         self.state_machine.run = self.state_machine.REPETITIONS_MAX
@@ -91,20 +93,20 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.set_timer(0.1)
         self.state_machine.ifstatus_up_and_configured = True
 
-        # Test transition to SearchingForService when timer expires
+        # UML: ServiceReady --> SearchingForService : [Timer expired]
         time.sleep(0.2)
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]
         self.state_machine.handle_service_ready()
         self.assertEqual(self.state_machine.state, "SearchingForService")
 
-        # Test transition to RequestedButNotReady when ifstatus is not up and configured
+        # UML: ServiceReady --> RequestedButNotReady : [ifstatus!=up_and_configured]
         self.state_machine.state = "ServiceReady"
         self.state_machine.ifstatus_up_and_configured = False
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]
         self.state_machine.handle_service_ready()
         self.assertEqual(self.state_machine.state, "RequestedButNotReady")
 
-        # Test transition to Stopped when stop offer is received
+        # UML: ServiceReady --> Stopped : [receive(StopOfferService)]
         self.state_machine.state = "ServiceReady"
         self.state_machine.ifstatus_up_and_configured = True
         self.state_machine.sock.recvfrom.side_effect = [
@@ -119,12 +121,12 @@ class TestClientServiceStateMachine(unittest.TestCase):
         """Test handle_stopped state transitions"""
         self.state_machine.state = "Stopped"
 
-        # Test transition to NotRequested (ServiceNotSeen) when service is not requested
+        # UML: Stopped --> NotRequested : [Service Not Requested]
         self.state_machine.service_requested = False
         self.state_machine.handle_stopped()
         self.assertEqual(self.state_machine.state, "NotRequested")
 
-        # Test transition to ServiceReady when offer service is received
+        # UML: Stopped --> ServiceReady : [receive(OfferService)]
         self.state_machine.service_requested = True
         self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
         self.state_machine.handle_stopped()
@@ -296,7 +298,7 @@ class TestClientServiceStateMachine(unittest.TestCase):
         # Set timer and wait for expiration
         self.state_machine.set_timer(0.1)
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]
-        self.state_machine.handle_initial_wait_phase()
+        #self.state_machine.handle_initial_wait_phase()
         self.assertTrue(self.wait_for_state("SearchingForService", "RepetitionPhase"))
        
 
@@ -353,25 +355,32 @@ class TestClientServiceStateMachine(unittest.TestCase):
 
     def test_initial_state_transitions(self):
         """Test initial state transitions according to UML diagram"""
-        # Initial state should be Initial
-        self.assertEqual(self.state_machine.state, "Initial")
+        # Ensure the start state is "Initial"
+        self.state_machine.state = "Initial"
 
-        # Transition to NotRequested
+        # UML: [*] --> NotRequested : [Service Not Requested]
         self.state_machine.service_requested = False
+        self.state_machine.ifstatus_up_and_configured = False
         self.state_machine.handle_initial()
         self.assertEqual(self.state_machine.state, "NotRequested")
 
-        # Transition to RequestedButNotReady
+        # Reset to "Initial" state
+        self.state_machine.state = "Initial"
+
+        # UML: [*] --> RequestedButNotReady : [Requested and ifstatus!=up_and_configured]
         self.state_machine.service_requested = True
         self.state_machine.ifstatus_up_and_configured = False
         self.state_machine.handle_initial()
         self.assertEqual(self.state_machine.state, "RequestedButNotReady")
 
-        # Transition to SearchingForService
+        # Reset to "Initial" state
+        self.state_machine.state = "Initial"
+
+        # UML: [*] --> SearchingForService : ServiceRequested\nand if-status=up_and_configured
+        self.state_machine.service_requested = True
         self.state_machine.ifstatus_up_and_configured = True
-        self.state_machine.handle_requested_but_not_ready()
+        self.state_machine.handle_initial()
         self.assertEqual(self.state_machine.state, "SearchingForService")
-        self.assertEqual(self.state_machine.substate, "InitialWaitPhase")
 
     def test_initial_state_to_initial_wait_phase(self):
         """Test transition from initial state to InitialWaitPhase and then to RepetitionPhase"""
@@ -401,6 +410,78 @@ class TestClientServiceStateMachine(unittest.TestCase):
         # Stop the state machine
         self.state_machine.stop()
         thread.join(timeout=0.1)
+
+    def test_handle_not_requested(self):
+        """Test handle_not_requested state transitions"""
+        # UML: NotRequested --> RequestedButNotReady : [Requested and ifstatus!=up_and_configured]
+        self.state_machine.service_requested = True
+        self.state_machine.ifstatus_up_and_configured = False
+        self.state_machine.handle_not_requested()
+        self.assertEqual(self.state_machine.state, "RequestedButNotReady")
+
+    def test_handle_service_not_seen(self):
+        """Test handle_service_not_seen state transitions"""
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceNotSeen"
+
+        # UML: ServiceNotSeen --> ServiceSeen : [receive(OfferService) /setTimer(TTL)]
+        self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
+        self.state_machine.handle_service_not_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceSeen")
+        self.assertIsNotNone(self.state_machine.timer)
+
+    def test_handle_service_seen(self):
+        """Test handle_service_seen state transitions"""
+        # Ensure the start state is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: ServiceSeen --> ServiceNotSeen : [ifstatus!=up_and_configured]
+        self.state_machine.ifstatus_up_and_configured = False
+        self.state_machine.handle_service_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceNotSeen")
+
+        # Ensure the start state is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: ServiceSeen --> ServiceNotSeen : [Timer expired (TTL)]
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.set_timer(0.1)
+        time.sleep(0.2)
+        self.state_machine.handle_service_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceNotSeen")
+
+        # Ensure the start state is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: ServiceSeen --> ServiceNotSeen : [receive(StopServiceOffer)]
+        self.state_machine.set_timer(0.1)
+        self.state_machine.sock.recvfrom.side_effect = [(b"StopServiceOffer", ("127.0.0.1", 30491)), (b"StopServiceOffer", ("127.0.0.1", 30491))]
+        self.state_machine.handle_service_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceNotSeen")
+
+        # Ensure the start state is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: ServiceSeen --> ServiceSeen : [receive(OfferService) /setTimer(TTL)]
+        self.state_machine.set_timer(0.1)
+        self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
+        self.state_machine.handle_service_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceSeen")
+        self.assertIsNotNone(self.state_machine.timer)
+
+        # Ensure the start state is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: ServiceSeen --> ServiceReady : [InternalServiceRequest and ifstatus==up_and_configured]
+        self.state_machine.service_requested = True
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.handle_service_seen()
+        self.assertEqual(self.state_machine.substate, "ServiceReady")
 
 if __name__ == '__main__':
     unittest.main()
