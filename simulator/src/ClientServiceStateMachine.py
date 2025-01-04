@@ -83,9 +83,27 @@ class ClientServiceStateMachine:
             self.state = "SearchingForService"
             self.handle_searching_for_service_initial_entry()
 
+    def handle_service_seen(self):
+        """Handle ServiceSeen state."""
+        if not self.ifstatus_up_and_configured:
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.timer_expired():
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.receive_stop_offer_service():
+            self.transition_to_state("NotRequested", "ServiceNotSeen")
+        elif self.ifstatus_up_and_configured:
+            self.internal_service_request()
+            self.transition_to_state("Main", "ServiceReady")
+
     def handle_not_requested(self):
+        print("""Handle the NotRequested state.""")
         if self.service_requested and not self.ifstatus_up_and_configured:
-            self.state = "RequestedButNotReady"
+            self.transition_to_state("RequestedButNotReady")
+            return
+        if self.substate == "ServiceNotSeen":
+            self.handle_service_not_seen()
+        elif self.substate == "ServiceSeen":
+            self.handle_service_seen()
 
     def handle_requested_but_not_ready(self):
         if self.ifstatus_up_and_configured:
