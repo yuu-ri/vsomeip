@@ -79,7 +79,7 @@ class ClientServiceStateMachine:
             self.state = "SearchingForService"
             self.handle_searching_for_service_initial_entry()
 
-   def handle_not_requested(self):
+    def handle_not_requested(self):
         if self.service_requested and not self.ifstatus_up_and_configured:
             self.state = "RequestedButNotReady"
 
