@@ -11,7 +11,7 @@ class ClientServiceStateMachine:
     TTL = 5
 
     def __init__(self, udp_ip="127.0.0.1", udp_port=30491):
-        self.state = "NotRequested"
+        self.state = "Initial"
         self.substate = None
         self.service_requested = False
         self.udp_ip = udp_ip
@@ -70,15 +70,18 @@ class ClientServiceStateMachine:
         self.substate = substate
         print(f"Client: Transitioning to {state} {substate if substate else ''}")
 
-    def handle_not_requested(self):
-        print(f"handle_not_requested:{self.service_requested}, {self.ifstatus_up_and_configured}")
-        if self.service_requested:
-            if not self.ifstatus_up_and_configured:
-                self.transition_to_state("RequestedButNotReady")
-            else:
-                self.transition_to_state("NotRequested")
-        else:
-            self.transition_to_state("NotRequested")
+    def handle_initial(self):
+        if not self.service_requested:
+            self.state = "NotRequested"
+        elif self.service_requested and not self.ifstatus_up_and_configured:
+            self.state = "RequestedButNotReady"
+        elif self.service_requested and self.ifstatus_up_and_configured:
+            self.state = "SearchingForService"
+            self.handle_searching_for_service_initial_entry()
+
+   def handle_not_requested(self):
+        if self.service_requested and not self.ifstatus_up_and_configured:
+            self.state = "RequestedButNotReady"
 
     def handle_requested_but_not_ready(self):
         if self.ifstatus_up_and_configured:
@@ -120,8 +123,6 @@ class ClientServiceStateMachine:
         elif self.substate == "RepetitionPhase":
             self.handle_repetition_phase()
 
-
-
     def handle_service_ready(self):
         if self.receive_offer_service():
             self.reset_timer(self.TTL)
@@ -144,7 +145,9 @@ class ClientServiceStateMachine:
 
     def run_state_machine(self):
         while not self.stop_event.is_set():
-            if self.state == "NotRequested":
+            if self.state == "Initial":
+                self.handle_initial()
+            elif self.state == "NotRequested":
                 self.handle_not_requested()
             elif self.state == "RequestedButNotReady":
                 self.handle_requested_but_not_ready()
