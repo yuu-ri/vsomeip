@@ -64,6 +64,34 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.handle_searching_for_service()
         self.assertEqual(self.state_machine.state, "RequestedButNotReady")
 
+        # UML: SearchingForService:InitialWaitPhase --> RepetitionPhase : [Timer expired\nsend(FindService)]
+        self.state_machine.state = "SearchingForService"
+        self.state_machine.substate = "InitialWaitPhase"
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.set_timer(0.1)
+        time.sleep(0.2)
+        self.state_machine.handle_searching_for_service()
+        self.assertEqual(self.state_machine.substate, "RepetitionPhase")
+
+        # UML: RepetitionPhase --> TimerSet2 : [REPETITONS_MAX>0] /run=0 \n setTimer(2^run * REPETITIONS_BASE_DELAY)
+        self.state_machine.state = "SearchingForService"
+        self.state_machine.substate = "RepetitionPhase"
+        self.state_machine.run = 0
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.set_timer(2 ** self.state_machine.run * self.state_machine.REPETITIONS_BASE_DELAY)
+        self.assertEqual(self.state_machine.substate, "RepetitionPhase")
+
+        # UML: TimerSet2 --> TimerSet2 : [Timer expired[run < REPETITIONS_MAX] \n send(FindService) \n run++ \n setTimer(2^run * REPETITIONS_BASE_DELAY)]
+        self.state_machine.state = "SearchingForService"
+        self.state_machine.substate = "RepetitionPhase"
+        self.state_machine.run = 0
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.set_timer(0.1)
+        time.sleep(0.2)
+        self.state_machine.handle_searching_for_service()
+        self.assertEqual(self.state_machine.substate, "RepetitionPhase")
+        self.assertEqual(self.state_machine.run, 1)
+
         # UML: SearchingForService:RepetitionPhase --> Stopped : [receive(StopOfferService)]
         self.state_machine.state = "SearchingForService"
         self.state_machine.substate = "RepetitionPhase"
@@ -98,6 +126,16 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.sock.recvfrom.side_effect = [socket.timeout()]
         self.state_machine.handle_service_ready()
         self.assertEqual(self.state_machine.state, "SearchingForService")
+
+        # Ensure the start state is "ServiceReady"
+        self.state_machine.state = "ServiceReady"
+        self.state_machine.ifstatus_up_and_configured = True
+
+        # UML: ServiceReady --> ServiceReady : [receive(OfferService) \n resetTimer(TTL)]
+        self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
+        self.state_machine.handle_service_ready()
+        self.assertEqual(self.state_machine.state, "ServiceReady")
+        self.assertIsNotNone(self.state_machine.timer)
 
         # UML: ServiceReady --> RequestedButNotReady : [ifstatus!=up_and_configured]
         self.state_machine.state = "ServiceReady"

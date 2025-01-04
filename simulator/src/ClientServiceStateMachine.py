@@ -88,7 +88,7 @@ class ClientServiceStateMachine:
     def handle_service_seen(self):
         """Handle ServiceSeen state."""
         if self.receive_offer_service():
-            self.set_timer(TTL)
+            self.set_timer(self.TTL)
             self.substate = "ServiceSeen"
         if not self.ifstatus_up_and_configured:
             self.transition_to_state("NotRequested", "ServiceNotSeen")
