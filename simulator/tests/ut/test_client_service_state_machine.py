@@ -37,6 +37,36 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.handle_not_requested()
         self.assertEqual(self.state_machine.state, "RequestedButNotReady")
 
+        # Ensure the start state is "NotRequested" and substate is "ServiceNotSeen"
+        self.state_machine.service_requested = False
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceNotSeen"
+
+        # UML: NotRequested:ServiceNotSeen --> ServiceSeen : [receive(OfferService) /setTimer(TTL)]
+        self.state_machine.sock.recvfrom.side_effect = [(b"OfferService", ("127.0.0.1", 30491))]
+        self.state_machine.handle_not_requested()
+        self.assertEqual(self.state_machine.substate, "ServiceSeen")
+        self.assertIsNotNone(self.state_machine.timer)
+
+        # Ensure the start state is "NotRequested" and substate is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: NotRequested:ServiceSeen --> ServiceNotSeen : [ifstatus!=up_and_configured]
+        self.state_machine.ifstatus_up_and_configured = False
+        self.state_machine.handle_not_requested()
+        self.assertEqual(self.state_machine.substate, "ServiceNotSeen")
+
+        # Ensure the start state is "NotRequested" and substate is "ServiceSeen"
+        self.state_machine.state = "NotRequested"
+        self.state_machine.substate = "ServiceSeen"
+
+        # UML: NotRequested:ServiceSeen --> ServiceReady : [InternalServiceRequest and ifstatus==up_and_configured]
+        self.state_machine.service_requested = True
+        self.state_machine.ifstatus_up_and_configured = True
+        self.state_machine.handle_not_requested()
+        self.assertEqual(self.state_machine.substate, "ServiceReady")
+
   
     def test_handle_requested_but_not_ready(self):
         """Test handle_requested_but_not_ready state transitions"""
@@ -449,14 +479,7 @@ class TestClientServiceStateMachine(unittest.TestCase):
         self.state_machine.stop()
         thread.join(timeout=0.1)
 
-    def test_handle_not_requested(self):
-        """Test handle_not_requested state transitions"""
-        # UML: NotRequested --> RequestedButNotReady : [Requested and ifstatus!=up_and_configured]
-        self.state_machine.service_requested = True
-        self.state_machine.ifstatus_up_and_configured = False
-        self.state_machine.handle_not_requested()
-        self.assertEqual(self.state_machine.state, "RequestedButNotReady")
-
+   
     def test_handle_service_not_seen(self):
         """Test handle_service_not_seen state transitions"""
         self.state_machine.state = "NotRequested"
