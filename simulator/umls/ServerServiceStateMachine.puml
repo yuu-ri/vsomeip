@@ -10,9 +10,6 @@ skinparam state {
 state NotReady
 NotReady --> Ready : if-status-changed() or service-status-changed() [ifstatus==up_and_configured and service-status==up]
 
-Ready --> NotReady : if-status-changed [ifstatus!=up_and_configured] / clearAllTimers()
-Ready --> NotReady : service-status==down /clearAllTimers() \n send(StopOfferService)
-
 state Ready {
   [*] --> InitialWaitPhase
 
@@ -38,5 +35,8 @@ state Ready {
     TimerSet3 --> TimerSet3 : receive(FindService) / waitAndSend(OfferService) \n resetTimer()
   }
 }
+
+Ready --> NotReady : if-status-changed [ifstatus!=up_and_configured] / clearAllTimers()
+Ready --> NotReady : service-status==down /clearAllTimers() \n send(StopOfferService)
 
 @enduml

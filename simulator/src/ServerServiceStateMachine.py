@@ -12,22 +12,22 @@ class ServerServiceStateMachine:
 
     def __init__(self, udp_ip="127.0.0.1", udp_port=30490):
         # States
-        self.state = "NotReady"
+        self.state = "Initial"  # UML: Initial state [*] --> Initial
         self.substate = None
         self.ifstatus_up_and_configured = False
         self.service_status_up = False
-        
+
         # Timer and counters
         self.timer = None
         self.run = 0
-        
+
         # Communication
         self.udp_ip = udp_ip
         self.udp_port = udp_port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((self.udp_ip, self.udp_port))
         self.sock.settimeout(0.1)
-        
+
         # Thread control
         self.stop_event = threading.Event()
 
@@ -58,17 +58,29 @@ class ServerServiceStateMachine:
         time.sleep(0.01)  # Small delay
         self.send_offer_service()
 
+    def handle_initial(self):
+        # UML: Initial --> NotReady : [ifstatus!=up_and_configured or service-status==down]
+        # UML: Initial --> Ready : [ifstatus==up_and_configured and service-status==up]
+        if self.ifstatus_up_and_configured and self.service_status_up:
+            self.state = "Ready"
+            self.handle_initial_entry_ready()
+        else:
+            self.state = "NotReady"
+
     def handle_not_ready(self):
+        # UML: NotReady --> Ready: [ifstatus==up_and_configured and service_status==up]
         if self.ifstatus_up_and_configured and self.service_status_up:
             self.state = "Ready"
             self.handle_initial_entry_ready()
 
     def handle_initial_entry_ready(self):
+        # UML: Ready --> InitialWaitPhase (substate transition)
         self.substate = "InitialWaitPhase"
         self.set_timer(self.INITIAL_DELAY_MIN + (self.INITIAL_DELAY_MAX - self.INITIAL_DELAY_MIN) * time.time() % 1)
 
     def handle_initial_wait_phase(self):
         if self.timer_expired():
+            # UML: InitialWaitPhase --> RepetitionPhase
             self.substate = "RepetitionPhase"
             self.run = 0
             self.send_offer_service()
@@ -81,10 +93,12 @@ class ServerServiceStateMachine:
 
         if self.timer_expired():
             if self.run < self.REPETITIONS_MAX:
+                # UML: Retry logic within RepetitionPhase
                 self.send_offer_service()
                 self.run += 1
                 self.set_timer((2 ** self.run) * self.REPETITIONS_BASE_DELAY)
             else:
+                # UML: RepetitionPhase --> MainPhase
                 self.substate = "MainPhase"
                 self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
                 self.send_offer_service()
@@ -95,21 +109,25 @@ class ServerServiceStateMachine:
             return
 
         if self.timer_expired():
+            # UML: MainPhase cyclic announcement
             self.set_timer(self.CYCLIC_ANNOUNCE_DELAY)
             self.send_offer_service()
 
     def handle_ready(self):
         if not self.ifstatus_up_and_configured:
+            # UML: Ready --> NotReady: [ifstatus!=up_and_configured] / clearAllTimers()
             self.clear_all_timers()
             self.state = "NotReady"
             return
-        
+
         if not self.service_status_up:
+            # UML: Ready --> NotReady: [service_status==down] / clearAllTimers(), sendStopOfferService()
             self.clear_all_timers()
             self.send_stop_offer_service()
             self.state = "NotReady"
             return
 
+        # Handle substates in Ready
         if self.substate == "InitialWaitPhase":
             self.handle_initial_wait_phase()
         elif self.substate == "RepetitionPhase":
@@ -119,7 +137,9 @@ class ServerServiceStateMachine:
 
     def run_state_machine(self):
         while not self.stop_event.is_set():
-            if self.state == "NotReady":
+            if self.state == "Initial":
+                self.handle_initial()
+            elif self.state == "NotReady":
                 self.handle_not_ready()
             elif self.state == "Ready":
                 self.handle_ready()
@@ -127,3 +147,4 @@ class ServerServiceStateMachine:
 
     def stop(self):
         self.stop_event.set()
+
